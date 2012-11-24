@@ -1,4 +1,4 @@
-import pymongo
+import cherrypy, pymongo, json
 import numpy as np
 
 mconn = pymongo.Connection()
@@ -8,7 +8,6 @@ divisions = db.voterecorddivisions
 vdm = db.voterecordvdm
 voterecordvotetype = db.voterecordvotetype
 
-ANSWERS = []
 EPSILON = 5
 
 def possible_answers(key): return coll.distinct(key)
@@ -39,15 +38,7 @@ def parse_answer(key, answer):
     elif key in ['mp_change', 'party_change', 'election_reason', 'vvt']: return ""
     else: return get_vote_id(answer)
 
-def get_question_answer(key):
-    print question_text(key)
-    for t in answer_texts(key):
-        print " - %s" % t
-    answer = parse_answer(key, raw_input())
-    if answer in possible_answers(key): ANSWERS.append([key, answer])
-    print ANSWERS
-
-def get_matching_mps(): return list(coll.find(dict(ANSWERS)))
+def get_matching_mps(answers): return list(coll.find(dict(answers)))
 def get_cost_answers(mps): return len(mps)
 
 def tory_votes(key): return get_votes(key, 'Conservative')
@@ -85,16 +76,27 @@ def least_covariance(orig_data, cols_to_skip):
     covs = sorted(covs, key = lambda x: x[1], reverse = True)
     return covs[0][0]
 
+def get_response_for_key(key): return {'question': question_text(key), 'question_id': key, 'answers': answer_texts(key)}
 
-get_question_answer('region')
-while True:
-    mps = get_matching_mps()
-    cost = get_cost_answers(mps)
-    # TODO Don't just get first here; do proper cost function
-    if cost == 0: raise BaseException
-    if cost < EPSILON:
-        print "ANSWER: %s %s" % (mps[0]['first_name'], mps[0]['last_name'])
-        break
+class App(object):
+    def index(self, **answers):
+        for k in answers.keys():
+            answers[k] = parse_answer(k, answers[k])
+        print answers
+        response = {}
+        if len(answers) == 0:
+            response = get_response_for_key('region')
+        else:
+            mps = get_matching_mps(answers)
+            cost = get_cost_answers(mps)
+            # TODO Don't just get first here; do proper cost function
+            if cost == 0: response = {"error": "No match found"}
+            elif cost < EPSILON: response = {"match": "%s %s" % (mps[0]['first_name'], mps[0]['last_name'])}
+            else:
+                next_col = least_covariance(mps, map(lambda r: r[0], answers))
+                response = get_response_for_key(next_col)
+        return json.dumps(response)
+    index.exposed = True
 
-    next_col = least_covariance(mps, map(lambda r: r[0], ANSWERS))
-    get_question_answer(next_col)
+cherrypy.config.update({'server.socket_port': 8000})
+cherrypy.quickstart(App())
