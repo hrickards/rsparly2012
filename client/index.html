@@ -1,6 +1,22 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <title>Parlinator</title>
+    <style type="text/css">
+      body {
+        background-image:url(background.jpg);
+        background-repeat:no-repeat;
+        background-position:center top;
+      }
+      #churchill {
+        width:62.50em;
+        height:37.500em;
+        margin-left:auto;
+        margin-right:auto;
+        margin-top:-4px;
+        z-index:-1;
+      }
+    </style>
     <script type="text/javascript" src="http://code.jquery.com/jquery.min.js"></script>
     <script type="text/javascript">
       $(function() {
@@ -41,11 +57,14 @@
     </script>
   </head>
   <body>
+    <div id="churchill">
+    <img src="churchill.jpg"/>
+    </div>
     <div id="question">
     </div>
     <div id="answers">
     </div>
-    <div id="result">
+    <div id="results">
     </div>
   </body>
 </html>
