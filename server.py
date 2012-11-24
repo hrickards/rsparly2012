@@ -1,4 +1,4 @@
-import cherrypy, pymongo, json
+import cherrypy, pymongo, json, os
 import numpy as np
 
 mconn = pymongo.Connection()
@@ -64,7 +64,7 @@ def least_covariance(orig_data, cols_to_skip):
         mapping = dict(map(lambda r: r[::-1], enumerate(vals)))
         hash_maps[col] = mapping
 
-    data = map(lambda r: map(lambda (k, v): hash_maps[k][v] if k in cols_to_hash else v, r), data)
+    data = map(lambda r: map(lambda (k, v): int(hash_maps[k][v]) if k in cols_to_hash else int(v), r), data)
     data = np.transpose(np.array(data))
 
     covs = np.cov(data)
@@ -81,9 +81,10 @@ def get_response_for_key(key): return {'question': question_text(key), 'question
 class App(object):
     def index(self, **answers):
         for k in answers.keys():
-            answers[k] = parse_answer(k, answers[k])
-        print answers
+            if answers[k] == "Not sure": del answers[k]
+            else: answers[k] = parse_answer(k, answers[k])
         response = {}
+        print answers
         if len(answers) == 0:
             response = get_response_for_key('region')
         else:
@@ -91,12 +92,24 @@ class App(object):
             cost = get_cost_answers(mps)
             # TODO Don't just get first here; do proper cost function
             if cost == 0: response = {"error": "No match found"}
-            elif cost < EPSILON: response = {"match": "%s %s" % (mps[0]['first_name'], mps[0]['last_name'])}
+            elif cost < EPSILON: response = {"success": "%s %s" % (mps[0]['first_name'], mps[0]['last_name'])}
             else:
                 next_col = least_covariance(mps, map(lambda r: r[0], answers))
                 response = get_response_for_key(next_col)
         return json.dumps(response)
     index.exposed = True
 
+class Root(object): pass
+PATH = os.path.abspath(os.path.dirname(__file__))
+
 cherrypy.config.update({'server.socket_port': 8000})
-cherrypy.quickstart(App())
+cherrypy.tree.mount(App(), '/api')
+cherrypy.tree.mount(Root(), '/', config={
+    '/': {
+        'tools.staticdir.on': True,
+        'tools.staticdir.dir': "%s/client/" % PATH,
+        'tools.staticdir.index': 'index.html',
+        },
+    })
+cherrypy.engine.start()
+cherrypy.engine.block()

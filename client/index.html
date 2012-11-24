@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="http://code.jquery.com/jquery.min.js"></script>
+    <script type="text/javascript">
+      $(function() {
+          window.answers = {};
+          $('.answer').live('click', function() {
+            window.answers[window.question_id] = $(this).text();
+            send_data();
+          });
+          send_data();
+          function send_data() {
+            $.ajax({
+              url: "/api",
+              dataType: 'json',
+              data: window.answers,
+              success: function(data) {
+                if (data['error']) {
+                  console.log(data);
+                } else if (data['success']) {
+                  $('#question').hide();
+                  $('#answers').hide();
+                  $('#result').text(data['success']);
+                  $('#result').show();
+                } else {
+                  window.question_id = data['question_id']
+                  $('#question').text(data['question']);
+                  $('#answers').html('');
+                  $.each(data['answers'], function(i, answer) {
+                    $('#answers').append("<div class='answer'>" + answer + "</div>");
+                  });
+                }
+              }
+            });
+          }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="question">
+    </div>
+    <div id="answers">
+    </div>
+    <div id="result">
+    </div>
+  </body>
+</html>
