@@ -74,11 +74,23 @@
                   window.question_id = data['question_id']
                   $('#question').text(data['question']);
                   $('#answers').html('');
-                  $.each(data['answers'], function(i, answer) {
-                    $('#answers').append("<div class='answer'>" + answer + "</div>");
-                  });
+                  if (window.question_id == 'region') {
+                    $('#churchill').text('');
+                    $('#churchill').append('<img src="map.jpg" usemap="mapmap" border="0" width="1000" height="700" alt="" /> <map id="mapmap" name="mapmap"> <area shape="poly" coords="301,395,307,402,318,395,325,389,334,396,349,382,366,383,374,370,374,351,374,337,365,331,352,347,342,359,330,359,322,377,300,379," id="South West" class="mapping"/> </map>');
+                    $('.mapping').click(function() {
+                      window.answers[window.question_id] = $(this).attr('id');
+                      $('#churchill').text('');
+                      $('#churchill').append('<img src="churchill.jpg"/>');
+                      send_data();
+                    });
+                    no_answers = 0;
+                  } else {
+                    $.each(data['answers'], function(i, answer) {
+                      $('#answers').append("<div class='answer'>" + answer + "</div>");
+                    });
 
-                  no_answers = data['answers'].length;
+                    no_answers = data['answers'].length;
+                  }
                   no_questions = Math.ceil(data['question'].length / 33);
                   dialogue_height = 5+(no_questions + no_answers)*1.9;
                   $('#dialogue').height(dialogue_height + "em");
