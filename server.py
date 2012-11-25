@@ -27,15 +27,17 @@ def question_text(key):
 
 def answer_texts(key):
     # TODO mp_change, party_change, election_reason, vvt
-    if key in ['party', 'region', 'gender']: answers = possible_answers(key)
-    elif key in ['mp_change', 'party_change', 'election_reason', 'vvt']: answers = ["YOU PIECE OF SHIT HARRY IMPLEMENT IT"]
+    if key in ['party', 'region', 'gender', 'election_reason']: answers = possible_answers(key)
+    elif key in ['mp_change', 'party_change']: answers = ["Yes", "No"]
+    elif key == 'vvt': answers = ["<25%", "25%<=t<50%", "50%<=t<75%", ">=75%"]
     else: answers = map(get_vote_type, possible_answers(key))
     answers.append("Not sure")
     return answers
 
 def parse_answer(key, answer):
-    if key in ['party', 'region', 'gender']: return answer
-    elif key in ['mp_change', 'party_change', 'election_reason', 'vvt']: return ""
+    if key in ['party', 'region', 'gender', 'election_reason']: return answer
+    elif key in ["mp_change", "party_change"]: return answer == "Yes"
+    elif key == 'vvt': {"<25%": 0, "25%<=t<50%": 1, "50%<=t<75%": 2, ">=75%": 3}[key]
     else: return get_vote_id(answer)
 
 def unique(a):
