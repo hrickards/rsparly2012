@@ -1,4 +1,4 @@
-import cherrypy, pymongo, json, os
+import cherrypy, pymongo, json, os, itertools
 import numpy as np
 
 mconn = pymongo.Connection()
@@ -8,7 +8,7 @@ divisions = db.voterecorddivisions
 vdm = db.voterecordvdm
 voterecordvotetype = db.voterecordvotetype
 
-EPSILON = 5
+EPSILON = 3
 
 def possible_answers(key): return coll.distinct(key)
 def question_text(key):
@@ -38,8 +38,127 @@ def parse_answer(key, answer):
     elif key in ['mp_change', 'party_change', 'election_reason', 'vvt']: return ""
     else: return get_vote_id(answer)
 
-def get_matching_mps(answers): return list(coll.find(dict(answers)))
-def get_cost_answers(mps): return len(mps)
+def unique(a):
+    indices = sorted(range(len(a)), key=a.__getitem__)
+    indices = set(next(it) for k, it in itertools.groupby(indices, key=a.__getitem__))
+    return [x for i, x in enumerate(a) if i in indices]
+
+def cartesian_product2(arrays):
+    la = len(arrays)
+    arr = np.empty([len(a) for a in arrays] + [la])
+    for i, a in enumerate(np.ix_(*arrays)):
+        arr[...,i] = a
+    return arr.reshape(-1, la)
+
+def algorithm_u(ns, m):
+    def visit(n, a):
+        ps = [[] for i in xrange(m)]
+        for j in xrange(n):
+            ps[a[j + 1]].append(ns[j])
+        return ps
+
+    def f(mu, nu, sigma, n, a):
+        if mu == 2:
+            yield visit(n, a)
+        else:
+            for v in f(mu - 1, nu - 1, (mu + sigma) % 2, n, a):
+                yield v
+        if nu == mu + 1:
+            a[mu] = mu - 1
+            yield visit(n, a)
+            while a[nu] > 0:
+                a[nu] = a[nu] - 1
+                yield visit(n, a)
+        elif nu > mu + 1:
+            if (mu + sigma) % 2 == 1:
+                a[nu - 1] = mu - 1
+            else:
+                a[mu] = mu - 1
+            if (a[nu] + sigma) % 2 == 1:
+                for v in b(mu, nu - 1, 0, n, a):
+                    yield v
+            else:
+                for v in f(mu, nu - 1, 0, n, a):
+                    yield v
+            while a[nu] > 0:
+                a[nu] = a[nu] - 1
+                if (a[nu] + sigma) % 2 == 1:
+                    for v in b(mu, nu - 1, 0, n, a):
+                        yield v
+                else:
+                    for v in f(mu, nu - 1, 0, n, a):
+                        yield v
+
+    def b(mu, nu, sigma, n, a):
+        if nu == mu + 1:
+            while a[nu] < mu - 1:
+                visit(n, a)
+                a[nu] = a[nu] + 1
+            visit(n, a)
+            a[mu] = 0
+        elif nu > mu + 1:
+            if (a[nu] + sigma) % 2 == 1:
+                for v in f(mu, nu - 1, 0, n, a):
+                    yield v
+            else:
+                for v in b(mu, nu - 1, 0, n, a):
+                    yield v
+            while a[nu] < mu - 1:
+                a[nu] = a[nu] + 1
+                if (a[nu] + sigma) % 2 == 1:
+                    for v in f(mu, nu - 1, 0, n, a):
+                        yield v
+                else:
+                    for v in b(mu, nu - 1, 0, n, a):
+                        yield v
+            if (mu + sigma) % 2 == 1:
+                a[nu - 1] = 0
+            else:
+                a[mu] = 0
+        if mu == 2:
+            visit(n, a)
+        else:
+            for v in b(mu - 1, nu - 1, (mu + sigma) % 2, n, a):
+                yield v
+
+    n = len(ns)
+    a = [0] * (n + 1)
+    for j in xrange(1, m + 1):
+        a[n - m + j] = j - 1
+    return f(m, n, 0, n, a)
+
+def find_result(answers):
+    m = len(answers)
+    k = 10
+    limit = int(1e6)
+
+    best_epsilon_diff = float("inf")
+    mps = []
+
+    for i in range(m):
+        A = map(dict, list(itertools.islice(itertools.combinations(answers.items(), m-i), limit)))
+
+        P = map(lambda a: list(coll.find(dict(a))), A)
+        P = filter(lambda p: len(p) != 0, P)
+        if len(P) == 0: continue
+
+        B = sorted(P, key = lambda p: len(p), reverse=True)[0]
+        print "%d: %d" % (m-i, len(B))
+        epsilon_diff = len(B) - EPSILON
+        if epsilon_diff < best_epsilon_diff:
+            best_epsilon_diff = epsilon_diff
+            mps = B
+
+        if len(B) < EPSILON:
+            M = sorted(B, key = lambda b: sum(map(lambda p: b in p, P)), reverse=True)[0]
+            return [M, mps]
+
+    print "Epsilon diff: %d" % best_epsilon_diff
+
+    return [[], mps]
+
+# def get_matching_mps(answers): return list(coll.find(dict(answers)))
+# def get_cost_answers(mps): return len(mps)
 
 def tory_votes(key): return get_votes(key, 'Conservative')
 def labour_votes(key): return get_votes(key, 'Labour')
@@ -94,14 +213,12 @@ class App(object):
         if len(answers) == 0:
             response = get_response_for_key('region')
         else:
-            mps = get_matching_mps(answers)
-            cost = get_cost_answers(mps)
-            # TODO Don't just get first here; do proper cost function
-            if cost == 0: response = {"error": "No match found"}
-            elif cost < EPSILON: response = {"success": "%s %s" % (mps[0]['first_name'], mps[0]['last_name'])}
-            else:
+            result, mps = find_result(answers)
+            if len(result) == 0:
                 next_col = least_covariance(mps, map(lambda r: r[0], answers), keys_to_skip)
                 response = get_response_for_key(next_col)
+            else:
+                response = {"success": "%s %s" % (result['first_name'], result['last_name'])}
         return json.dumps(response)
     index.exposed = True
 
