@@ -1,4 +1,4 @@
-import cherrypy, pymongo, json, os, itertools
+import cherrypy, pymongo, json, os, itertools, re
 import numpy as np
 
 mconn = pymongo.Connection()
@@ -17,19 +17,22 @@ def question_text(key):
               'party_change': 'Has their party only been in power since the last election?',
               'election_reason': 'Why were they elected?',
               'region': 'What region is their constituency in?',
-              'vvt': 'Estimate the voter turnout when they were last elected',
               'gender': 'What gender are they?'}
     if key in labels: return labels[key]
     else:
         div_title = divisions.find_one({'DivisionID': key})['DivTitle']
-        return "How did they vote for %s (%d Labour MPs and %d Conservative MPs voted for this)?" % (div_title.split("-")[0].strip(","), labour_votes(key), tory_votes(key))
+        return "How did they vote for %s (%d Labour MPs and %d Conservative MPs voted for this)?" % (parse_bill_name(div_title), labour_votes(key), tory_votes(key))
         raise "foo"
 
+def parse_bill_name(name):
+    name = " ".join(re.split('Act|Bill', name)[0:2])
+    name = re.split('( ?,? ?Question)|;', name)[0]
+    return name
+
+
 def answer_texts(key):
-    # TODO mp_change, party_change, election_reason, vvt
     if key in ['party', 'region', 'gender', 'election_reason']: answers = possible_answers(key)
     elif key in ['mp_change', 'party_change']: answers = ["Yes", "No"]
-    elif key == 'vvt': answers = ["<25%", "25%<=t<50%", "50%<=t<75%", ">=75%"]
     else: answers = map(get_vote_type, possible_answers(key))
     answers.append("Not sure")
     return answers
@@ -37,7 +40,6 @@ def answer_texts(key):
 def parse_answer(key, answer):
     if key in ['party', 'region', 'gender', 'election_reason']: return answer
     elif key in ["mp_change", "party_change"]: return answer == "Yes"
-    elif key == 'vvt': {"<25%": 0, "25%<=t<50%": 1, "50%<=t<75%": 2, ">=75%": 3}[key]
     else: return get_vote_id(answer)
 
 def unique(a):
@@ -170,12 +172,12 @@ def get_votes(key, party): return vdm.find({"PARTY_NAME": party, "DivisionID": k
 def get_vote_type(vote_type): return voterecordvotetype.find_one({'VoteTypeID':vote_type})['VoteType']
 def get_vote_id(vote_type): return voterecordvotetype.find_one({'VoteType':vote_type})['VoteTypeID']
 
-def least_covariance(orig_data, cols_to_skip, keys_to_skip):
+def least_covariance(orig_data, cols_to_skip):
     modelen = np.bincount(map(len, orig_data)).argmax()
     orig_data = filter(lambda r: len(r) == modelen, orig_data)
 
     cols_to_skip.extend(['first_name', 'last_name', '_id'])
-    cols_to_hash = ['party', 'mp_change', 'party_change', 'election_reason', 'region', 'vvt', 'gender']
+    cols_to_hash = ['party', 'mp_change', 'party_change', 'election_reason', 'region', 'gender']
 
     data = map(lambda r: filter(lambda (k, v): k not in cols_to_skip, r.items()), orig_data)
     cols = [[k for k, v in r] for r in data]
@@ -197,15 +199,27 @@ def least_covariance(orig_data, cols_to_skip, keys_to_skip):
     covs = list(covs)
 
     covs = zip(cols, covs)
+    covs = filter(lambda r: not r[0] in cols_to_skip, covs)
+
+    print len(covs)
+
+    use_hashed_cols = map(lambda col: not col in cols_to_skip, cols_to_hash)
+    print cols_to_hash
+    print cols_to_skip
+    print use_hashed_cols
+    if any(use_hashed_cols): covs = filter(lambda r: r[0] in cols_to_hash, covs)
+    print len(covs)
+
     covs = sorted(covs, key = lambda x: x[1], reverse=True)
-    covs = filter(lambda r: not r[0] in keys_to_skip, covs)
+    print len(covs)
+
     return covs[0][0]
 
 def get_response_for_key(key): return {'question': question_text(key), 'question_id': key, 'answers': answer_texts(key)}
 
 class App(object):
     def index(self, **answers):
-        keys_to_skip = list(answers)
+        keys_to_skip = list(answers.keys())
         for k in answers.keys():
             if answers[k] == "Not sure": del answers[k]
             else: answers[k] = parse_answer(k, answers[k])
@@ -217,7 +231,7 @@ class App(object):
         else:
             result, mps = find_result(answers)
             if len(result) == 0:
-                next_col = least_covariance(mps, map(lambda r: r[0], answers), keys_to_skip)
+                next_col = least_covariance(mps, keys_to_skip)
                 response = get_response_for_key(next_col)
             else:
                 response = {"success": "%s %s" % (result['first_name'], result['last_name'])}

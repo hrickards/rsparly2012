@@ -31,22 +31,13 @@ for i, datum in enumerate(data):
     mp['mp_change'] = mp_change
     mp['party_change'] = prev_datum == None or (not mp_change and prev_datum['party'] != datum['party'])
 
-    mp['election_reason'] = datum['towhy']
+    mp['election_reason'] = datum['fromwhy'].replace("_", " ").capitalize()
 
     links = linkage.find_one({'TWFY_Member_id': datum["id"].split("/")[-1]})
     if links == None: continue
     candidate = election_results.find_one({'Parliament_Constituency_id': links['Parliament_Constituency_id'], 'AlphaSurname': datum['lastname']})
     if candidate == None: continue
     mp['region'] = candidate['Region']
-
-    votes_vs_turnout = float(candidate['Votes'])/float(candidate['Turnout'])
-    if votes_vs_turnout > 0.5:
-        if votes_vs_turnout > 0.75: vvt = 3
-        else: vvt = 2
-    else:
-        if votes_vs_turnout > 0.25: vvt = 1
-        else: vvt = 0
-    mp['vvt'] = vvt
 
     bio = biodata.find_one({'dods_id': links['DODS_id']})
     gender = bio['gender']
@@ -66,7 +57,6 @@ for i, datum in enumerate(data):
 # Party - MS
 # Gender - bio
 # Region - 2010
-# VVT - 2010
 # MP change - MS
 # Party change - MS
 # Votes on bills - votes data
