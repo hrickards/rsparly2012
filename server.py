@@ -10,6 +10,8 @@ divisions = db.voterecorddivisions
 vdm = db.voterecordvdm
 voterecordvotetype = db.voterecordvotetype
 
+CACHED_RESPONSES = {}
+
 EPSILON = 1
 
 def possible_answers(key): return coll.distinct(key)
@@ -237,18 +239,23 @@ class App(object):
         for k in answers.keys():
             if answers[k] == "Not sure": del answers[k]
             else: answers[k] = parse_answer(k, answers[k])
-        response = {}
-        if len(answers) == 0:
-            response = get_response_for_key('region')
-        elif len(answers) > 25:
-            response = {"error": "We failed"}
+
+        if hash(frozenset(answers.items())) in CACHED_RESPONSES: response = CACHED_RESPONSES[hash(frozenset(answers.items()))]
         else:
-            result, mps = find_result(answers)
-            if len(result) == 0:
-                next_col = least_covariance(mps, keys_to_skip)
-                response = get_response_for_key(next_col)
+            print "Not caching :("
+            response = {}
+            if len(answers) == 0:
+                response = get_response_for_key('region')
+            elif len(answers) > 25:
+                response = {"error": "We failed"}
             else:
-                response = {"success": "%s %s" % (result['first_name'], result['last_name'])}
+                result, mps = find_result(answers)
+                if len(result) == 0:
+                    next_col = least_covariance(mps, keys_to_skip)
+                    response = get_response_for_key(next_col)
+                else:
+                    response = {"success": "%s %s" % (result['first_name'], result['last_name'])}
+        CACHED_RESPONSES[hash(frozenset(answers.items()))] = response
         return json.dumps(response)
     index.exposed = True
 

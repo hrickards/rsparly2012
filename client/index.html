@@ -65,15 +65,11 @@
               data: window.answers,
               success: function(data) {
                 if (data['error']) {
-                  $('#question').hide();
-                  $('#answers').hide();
-                  $('#result').text("Error: " + data['error']);
-                  $('#result').show();
+                  $('#answers').text('');
+                  $('#question').text("Error: " + data['error']);
                 } else if (data['success']) {
-                  $('#question').hide();
-                  $('#answers').hide();
-                  $('#result').text(data['success']);
-                  $('#result').show();
+                  $('#answers').text('');
+                  $('#question').text(data['success']);
                 } else {
                   window.question_id = data['question_id']
                   $('#question').text(data['question']);
@@ -102,8 +98,6 @@
       <div id="question">
       </div>
       <div id="answers">
-      </div>
-      <div id="result">
       </div>
     </div>
   </body>
