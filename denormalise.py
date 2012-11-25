@@ -56,6 +56,8 @@ for i, datum in enumerate(data):
     if candidate == None: continue
     mp['region'] = candidate['Region']
 
+    mp['twfy_id'] = links['TWFY_Person_id']
+
     bio = biodata.find_one({'dods_id': links['DODS_id']})
     gender = bio['gender']
     mp['gender'] = gender

@@ -1,9 +1,10 @@
-import cherrypy, pymongo, json, os, itertools, re
+import cherrypy, pymongo, json, os, itertools, re, urllib2, json, urllib
 import numpy as np
 
 depts = open('depts', 'r').read().split("\n")[1:-1]
 mconn = pymongo.Connection()
 db = mconn.rsparly2012
+linkage = db.mpidlinktabledata
 coll = db.data
 coll_data = list(coll.find())
 divisions = db.voterecorddivisions
@@ -198,7 +199,7 @@ def least_covariance(orig_data, cols_to_skip):
     modelen = np.bincount(map(len, orig_data)).argmax()
     orig_data = filter(lambda r: len(r) == modelen, orig_data)
 
-    cols_to_skip.extend(['first_name', 'last_name', '_id'])
+    cols_to_skip.extend(['first_name', 'twfy_id', 'last_name', '_id'])
     cols_to_hash = ['party', 'mp_change', 'party_change', 'election_reason', 'region', 'gender', 'expense', 'unemployment', 'turnout', 'crime', 'has_government_post', 'has_opposition_post', 'is_sos', 'is_ssos', 'is_mos', 'is_smos']
     cols_to_hash.extend(map(lambda dept: "dept_%s" % dept, depts))
     cols_to_hash = set(cols_to_hash)
@@ -233,15 +234,28 @@ def least_covariance(orig_data, cols_to_skip):
 
 def get_response_for_key(key): return {'question': question_text(key), 'question_id': key, 'answers': answer_texts(key)}
 
+def get_answer_text(answer, key):
+    pas = answer_texts(key)
+    pas = filter(lambda pa: parse_answer(key, pa) == answer, pas)
+    return pas[0]
+
+def generate_result(result, answers, raw_answers):
+    incorrect_answers = filter(lambda (k,v): result[k] != v, answers.items())
+    incorrect_answers = map(lambda (k, vu): {'key': k, 'user':raw_answers[k], 'correct': get_answer_text(result[k], k)}, incorrect_answers)
+
+    return "/f.html?%s" % urllib.urlencode({'id': result['twfy_id'], 'incorrect': incorrect_answers})
+
 class App(object):
     def index(self, **answers):
-        keys_to_skip = list(answers.keys())
-        for k in answers.keys():
-            if answers[k] == "Not sure": del answers[k]
-            else: answers[k] = parse_answer(k, answers[k])
-
         if hash(frozenset(answers.items())) in CACHED_RESPONSES: response = CACHED_RESPONSES[hash(frozenset(answers.items()))]
         else:
+            raw_answers = {}
+            keys_to_skip = list(answers.keys())
+            for k in answers.keys():
+                if answers[k] == "Not sure": del answers[k]
+                else:
+                    raw_answers[k] = answers[k]
+                    answers[k] = parse_answer(k, answers[k])
             print "Not caching :("
             response = {}
             if len(answers) == 0:
@@ -254,10 +268,27 @@ class App(object):
                     next_col = least_covariance(mps, keys_to_skip)
                     response = get_response_for_key(next_col)
                 else:
-                    response = {"success": "%s %s" % (result['first_name'], result['last_name'])}
+                    response = {"success": generate_result(result, answers, raw_answers)}
         CACHED_RESPONSES[hash(frozenset(answers.items()))] = response
         return json.dumps(response)
+
+    def f(self, mpid, incorrect):
+        response = {'mpid': mpid}
+        twfy_url = "http://www.theyworkforyou.com/api/getMPInfo?key=FqQ7HAE6VXorA8NhKHAmUeW5&id=%s" % mpid
+        twfy = json.load(urllib2.urlopen(twfy_url))
+        incorrect = incorrect.replace("'", '"').replace(': u"', ': "')
+        incorrect = json.loads(incorrect)
+
+        incorrect_html = "\n".join(map(lambda ic: "<li>You said %s for '%s'; it's actually %s" % (ic.values()[0], question_text(ic.values()[1]), ic.values()[2]), incorrect))
+
+        html = "<h2>Incorrect fields</h2><ul>" + incorrect_html + "</ul><div id='name'>" + twfy['name'] + "</div>"
+
+        response = {'html': html}
+
+        return json.dumps(response)
+
     index.exposed = True
+    f.exposed = True
 
 class Root(object): pass
 PATH = os.path.abspath(os.path.dirname(__file__))

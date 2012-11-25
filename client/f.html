@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Parlinator</title>
+    <style type="text/css">
+      body {
+        background-image:url(background.jpg);
+        background-repeat:no-repeat;
+        background-position:center top;
+      }
+
+      #final {
+        width:62.50em;
+        height:37.500em;
+        margin-left:auto;
+        margin-right:auto;
+        margin-top:-4px;
+        z-index:-1000;
+      }
+
+      #container {
+        position: absolute;
+        left:17em;
+        top:5em;
+      }
+    </style>
+    <script type="text/javascript" src="http://code.jquery.com/jquery.min.js"></script>
+    <script type="text/javascript">
+      function getParameterByName(name)
+      {
+        name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+        var regexS = "[\\?&]" + name + "=([^&#]*)";
+        var regex = new RegExp(regexS);
+        var results = regex.exec(window.location.search);
+        if(results == null)
+          return "";
+        else
+          return decodeURIComponent(results[1].replace(/\+/g, " "));
+      }
+      $(function() {
+          $.ajax({
+            url: "/api/f",
+            dataType: 'json',
+            data: {'mpid': getParameterByName('id'), 'incorrect': getParameterByName('incorrect')},
+            success: function(data) {
+              $('#container').text('');
+              $('#container').append(data['html']);
+            }
+          });
+      });
+    </script>
+  </head>
+  <body>
+    <div id="final">
+      <img src="final_page.jpg"/>
+    </div>
+    <div id="container">
+    </div>
+  </body>
+</html>
