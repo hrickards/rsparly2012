@@ -4,11 +4,12 @@ import numpy as np
 mconn = pymongo.Connection()
 db = mconn.rsparly2012
 coll = db.data
+coll_data = list(coll.find())
 divisions = db.voterecorddivisions
 vdm = db.voterecordvdm
 voterecordvotetype = db.voterecordvotetype
 
-EPSILON = 3
+EPSILON = 1
 
 def possible_answers(key): return coll.distinct(key)
 def question_text(key):
@@ -135,10 +136,13 @@ def algorithm_u(ns, m):
         a[n - m + j] = j - 1
     return f(m, n, 0, n, a)
 
+def find_results(query): return filter(lambda r: row_matches(r, query), coll_data)
+def row_matches(r, query): return all(r[y] == x for y, x in query.items())
+
 def find_result(answers):
     m = len(answers)
     k = 10
-    limit = int(1e6)
+    limit = int(1e2)
 
     best_epsilon_diff = float("inf")
     mps = []
@@ -146,7 +150,7 @@ def find_result(answers):
     for i in range(m):
         A = map(dict, list(itertools.islice(itertools.combinations(answers.items(), m-i), limit)))
 
-        P = map(lambda a: list(coll.find(dict(a))), A)
+        P = map(lambda a: find_results(a), A)
         P = filter(lambda p: len(p) != 0, P)
         if len(P) == 0: continue
 
@@ -157,7 +161,8 @@ def find_result(answers):
             best_epsilon_diff = epsilon_diff
             mps = B
 
-        if len(B) < EPSILON:
+        if len(B) <= EPSILON:
+            print "YES"
             M = sorted(B, key = lambda b: sum(map(lambda p: b in p, P)), reverse=True)[0]
             return [M, mps]
 
@@ -205,18 +210,10 @@ def least_covariance(orig_data, cols_to_skip):
     covs = zip(cols, covs)
     covs = filter(lambda r: not r[0] in cols_to_skip, covs)
 
-    print len(covs)
-
     use_hashed_cols = map(lambda col: not col in cols_to_skip, cols_to_hash)
-    print cols_to_hash
-    print cols_to_skip
-    print use_hashed_cols
     if any(use_hashed_cols): covs = filter(lambda r: r[0] in cols_to_hash, covs)
-    print len(covs)
 
     covs = sorted(covs, key = lambda x: x[1], reverse=True)
-    print len(covs)
-
     return covs[0][0]
 
 def get_response_for_key(key): return {'question': question_text(key), 'question_id': key, 'answers': answer_texts(key)}
