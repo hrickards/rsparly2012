@@ -275,16 +275,31 @@ class App(object):
     def f(self, mpid, incorrect):
         response = {'mpid': mpid}
         twfy_url = "http://www.theyworkforyou.com/api/getMPInfo?key=FqQ7HAE6VXorA8NhKHAmUeW5&id=%s" % mpid
+        twfy_url2 = "http://www.theyworkforyou.com/api/getMP?key=FqQ7HAE6VXorA8NhKHAmUeW5&id=%s" % mpid
         twfy = json.load(urllib2.urlopen(twfy_url))
+        twfy2 = json.load(urllib2.urlopen(twfy_url2))[0]
         incorrect = incorrect.replace("'", '"').replace(': u"', ': "')
         incorrect = json.loads(incorrect)
 
         incorrect_html = "\n".join(map(lambda ic: "<li>You said %s for '%s'; it's actually %s" % (ic.values()[0], question_text(ic.values()[1]), ic.values()[2]), incorrect))
+        if len(incorrect) > 0: incorrect_html = "<h2>Incorrect fields</h2><ul>" + incorrect_html + "</ul>"
 
-        html = "<h2>Incorrect fields</h2><ul>" + incorrect_html + "</ul><div id='name'>" + twfy['name'] + "</div>"
+        details = [", ".join(map(lambda x: x['position'], twfy2['office'])), "%s, %s" % (twfy2['party'], twfy2['constituency'])]
+
+        urls = [
+                "<div class='urls'><a href='" + twfy['wikipedia_url'] + "'>Wikipedia</a>",
+                "<div class='urls'><a href='" + twfy['guardian_mp_summary'] + "'>Guardian</a>",
+                "<div class='urls'><a href='" + twfy['bbc_profile_url'] + "'>BBC</a>",
+                "<div class='urls'><a href='" + twfy['expenses_url'] + "'>Expenses</a>"
+                ]
+        urls = "\n".join(urls)
+
+        photo = "http://www.theyworkforyou.com%s" % twfy2['image']
+        photo_html = "<div id='image'><img src='" + photo + "'/></div>"
+
+        html = photo_html + "<h1>" + twfy['name'] + "</h1>" + incorrect_html + "\n".join(map(lambda d: "<div class='detail'>%s</div>" % d, details)) + "<br/>" + urls
 
         response = {'html': html}
-
         return json.dumps(response)
 
     index.exposed = True

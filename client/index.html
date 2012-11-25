@@ -68,8 +68,7 @@
                   $('#answers').text('');
                   $('#question').text("Error: " + data['error']);
                 } else if (data['success']) {
-                  $('#answers').text('');
-                  $('#question').text(data['success']);
+                  window.location.href = data['success'];
                 } else {
                   window.question_id = data['question_id']
                   $('#question').text(data['question']);
