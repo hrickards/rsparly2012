@@ -203,15 +203,15 @@ def get_response_for_key(key): return {'question': question_text(key), 'question
 
 class App(object):
     def index(self, **answers):
-        keys_to_skip = []
+        keys_to_skip = list(answers)
         for k in answers.keys():
-            if answers[k] == "Not sure":
-                keys_to_skip.append(k)
-                del answers[k]
+            if answers[k] == "Not sure": del answers[k]
             else: answers[k] = parse_answer(k, answers[k])
         response = {}
         if len(answers) == 0:
             response = get_response_for_key('region')
+        elif len(answers) > 25:
+            response = {"error": "We failed"}
         else:
             result, mps = find_result(answers)
             if len(result) == 0:
