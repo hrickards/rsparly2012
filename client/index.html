@@ -8,24 +8,56 @@
         background-repeat:no-repeat;
         background-position:center top;
       }
+
       #churchill {
         width:62.50em;
         height:37.500em;
         margin-left:auto;
         margin-right:auto;
         margin-top:-4px;
-        z-index:-1;
+        z-index:-1000;
+      }
+
+      #dialogue {
+        z-index:0;
+        position:absolute;
+        right:25.5em;
+        top:8.25em;
+        width: 300px;
+      }
+
+      #qa_container {
+        position: absolute;
+        right:25.2em;
+        top:10em;
+      }
+
+      #question {
+        width:13em;
+        height:auto;
+        z-index:1000;
+        text-align:center;
+      }
+
+      #answers {
+        width:16em;
+        height:auto;
+        z-index:1000;
+        text-align:left;
       }
     </style>
     <script type="text/javascript" src="http://code.jquery.com/jquery.min.js"></script>
     <script type="text/javascript">
       $(function() {
           window.answers = {};
+
           $('.answer').live('click', function() {
             window.answers[window.question_id] = $(this).text();
             send_data();
           });
+
           send_data();
+
           function send_data() {
             $.ajax({
               url: "/api",
@@ -49,6 +81,11 @@
                   $.each(data['answers'], function(i, answer) {
                     $('#answers').append("<div class='answer'>" + answer + "</div>");
                   });
+
+                  no_answers = data['answers'].length;
+                  no_questions = Math.ceil(data['question'].length / 33);
+                  dialogue_height = 5+(no_questions + no_answers)*1.9;
+                  $('#dialogue').height(dialogue_height + "em");
                 }
               }
             });
@@ -60,11 +97,14 @@
     <div id="churchill">
     <img src="churchill.jpg"/>
     </div>
-    <div id="question">
-    </div>
-    <div id="answers">
-    </div>
-    <div id="results">
+    <img id="dialogue" src="question.png" />
+    <div id="qa_container">
+      <div id="question">
+      </div>
+      <div id="answers">
+      </div>
+      <div id="result">
+      </div>
     </div>
   </body>
 </html>
