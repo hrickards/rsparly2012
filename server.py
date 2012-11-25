@@ -197,6 +197,7 @@ def get_vote_type(vote_type): return voterecordvotetype.find_one({'VoteTypeID':v
 def get_vote_id(vote_type): return voterecordvotetype.find_one({'VoteType':vote_type})['VoteTypeID']
 
 def least_covariance(orig_data, cols_to_skip):
+    if "party" not in cols_to_skip: return "party"
     modelen = np.bincount(map(len, orig_data)).argmax()
     orig_data = filter(lambda r: len(r) == modelen, orig_data)
 
