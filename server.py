@@ -17,6 +17,10 @@ def question_text(key):
               'party_change': 'Has their party only been in power since the last election?',
               'election_reason': 'Why were they elected?',
               'region': 'What region is their constituency in?',
+              'expense': 'Do they claim higher than averages expenses?',
+              'unemployment': 'Does their constituency have higher than average unemployment?',
+              'turnout': 'Was their higher than average turnout at the last election?',
+              'crime': 'Does their constituency have higher than average crime?',
               'gender': 'What gender are they?'}
     if key in labels: return labels[key]
     else:
@@ -32,14 +36,14 @@ def parse_bill_name(name):
 
 def answer_texts(key):
     if key in ['party', 'region', 'gender', 'election_reason']: answers = possible_answers(key)
-    elif key in ['mp_change', 'party_change']: answers = ["Yes", "No"]
+    elif key in ['mp_change', 'party_change', 'expense', 'unemployment', 'turnout', 'crime']: answers = ["Yes", "No"]
     else: answers = map(get_vote_type, possible_answers(key))
     answers.append("Not sure")
     return answers
 
 def parse_answer(key, answer):
     if key in ['party', 'region', 'gender', 'election_reason']: return answer
-    elif key in ["mp_change", "party_change"]: return answer == "Yes"
+    elif key in ["mp_change", "party_change", 'expense', 'unemployment', 'turnout', 'crime']: return answer == "Yes"
     else: return get_vote_id(answer)
 
 def unique(a):
@@ -177,7 +181,7 @@ def least_covariance(orig_data, cols_to_skip):
     orig_data = filter(lambda r: len(r) == modelen, orig_data)
 
     cols_to_skip.extend(['first_name', 'last_name', '_id'])
-    cols_to_hash = ['party', 'mp_change', 'party_change', 'election_reason', 'region', 'gender']
+    cols_to_hash = ['party', 'mp_change', 'party_change', 'election_reason', 'region', 'gender', 'expense', 'unemployment', 'turnout', 'crime']
 
     data = map(lambda r: filter(lambda (k, v): k not in cols_to_skip, r.items()), orig_data)
     cols = [[k for k, v in r] for r in data]

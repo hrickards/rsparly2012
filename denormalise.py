@@ -1,4 +1,4 @@
-import pymongo, sys
+import pymongo, sys, random
 from fish import ProgressFish
 
 mconn = pymongo.Connection()
@@ -11,8 +11,23 @@ biodata = db.biodata
 voterecordvdm = db.voterecordvdm
 vote_types = db.voterecordvotetype
 divisions = db.voterecorddivisions
+unemployments = db.unemploymentconstituency
+crimes = db.crimebyconstituencycrime
+expenses = db.expenses_aggregation
 coll = db.data
 coll.drop()
+
+unemployment_average = map(lambda x: float(x['01/09/2011 00:00:00']), unemployments.find())
+unemployment_average = sum(unemployment_average)/len(unemployment_average)
+
+crime_average = map(lambda x: float(x['Total']), crimes.find())
+crime_average = sum(crime_average)/len(crime_average)
+
+turnout_average = map(lambda x: float(x['TurnoutPercentage'].strip('%')), election_results.find())
+turnout_average = sum(turnout_average)/len(turnout_average)
+
+expense_average = map(lambda x: float(x['Total Claimed']), expenses.find())
+expense_average = sum(expense_average)/len(expense_average)
 
 LIMIT = int(1e4)
 
@@ -42,6 +57,21 @@ for i, datum in enumerate(data):
     bio = biodata.find_one({'dods_id': links['DODS_id']})
     gender = bio['gender']
     mp['gender'] = gender
+
+    unemployment = unemployments.find_one({'Parliament_Constituency_id': links['Parliament_Constituency_id']})
+    if unemployment == None: continue
+    mp['unemployment'] = float(unemployment['01/09/2011 00:00:00']) > unemployment_average
+
+    crime = crimes.find_one({'Constituency': candidate['ConstituencyName']})
+    if crime == None: mp['crime'] = random.random() > 0.5
+    else: mp['crime'] = float(crime['Total']) > crime_average
+
+    turnout = float(candidate['TurnoutPercentage'].strip("%"))
+    mp['turnout'] = turnout > turnout_average
+
+    expense = expenses.find_one({"MP's Name": "%s %s" % (links['FirstName'], links['LastName'])})
+    if expense == None: mp['expense'] = random.random() > 0.5
+    else: mp['expense'] = float(expense['Total Claimed']) > expense_average
 
     votes = voterecordvdm.find({'Parliament_People_id':links['Parliament_People_id']})
     for vote in votes:

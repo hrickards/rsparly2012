@@ -11,3 +11,7 @@ db.voterecordvdm.ensure_index([('Parliament_People_id', 1), ('PARTY_NAME', 1), (
 db.voterecordvotetype.ensure_index([('VoteTypeID', 1), ('VoteType', 1)])
 db.voterecorddivisions.ensure_index([('DivisionID', 1)])
 db.constituencieslatlon.ensure_index([('Parliament_Constituency_id', 1)])
+db.unemploymentconstituency.ensure_index([('Parliament_Constituency_id', 1)])
+db.crimebyconstituencycrime.ensure_index([('Constituency', 1)])
+db.mpsexpenses_2012.ensure_index([("MP's Name", 1)])
+db.expenses_aggregation.ensure_index([("MP's Name", 1)])
