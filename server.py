@@ -1,6 +1,7 @@
 import cherrypy, pymongo, json, os, itertools, re
 import numpy as np
 
+depts = open('depts', 'r').read().split("\n")[1:-1]
 mconn = pymongo.Connection()
 db = mconn.rsparly2012
 coll = db.data
@@ -22,7 +23,14 @@ def question_text(key):
               'unemployment': 'Does their constituency have higher than average unemployment?',
               'turnout': 'Was their higher than average turnout at the last election?',
               'crime': 'Does their constituency have higher than average crime?',
+              'has_government_post': 'Do they hold a government post?',
+              'has_opposition_post': 'Do they hold a opposition post?',
+              'is_sos': 'Are they a Secretary of State?',
+              'is_ssos': 'Are they a Shadow Secreatary of State?',
+              'is_mos': 'Are they a Minister of State?',
+              'is_smos': 'Are they a Shadow Minister of State?',
               'gender': 'What gender are they?'}
+    for dept in depts: labels["dept_%s" % dept] = "Do they work for/as %s" % dept
     if key in labels: return labels[key]
     else:
         div_title = divisions.find_one({'DivisionID': key})['DivTitle']
@@ -37,14 +45,14 @@ def parse_bill_name(name):
 
 def answer_texts(key):
     if key in ['party', 'region', 'gender', 'election_reason']: answers = possible_answers(key)
-    elif key in ['mp_change', 'party_change', 'expense', 'unemployment', 'turnout', 'crime']: answers = ["Yes", "No"]
+    elif key in ['mp_change', 'party_change', 'expense', 'unemployment', 'turnout', 'crime', 'has_government_post', 'has_opposition_post', 'is_sos', 'is_ssos', 'is_mos', 'is_smos'] or key in map(lambda dept: "dept_%s" % dept, depts): answers = ["Yes", "No"]
     else: answers = map(get_vote_type, possible_answers(key))
     answers.append("Not sure")
     return answers
 
 def parse_answer(key, answer):
     if key in ['party', 'region', 'gender', 'election_reason']: return answer
-    elif key in ["mp_change", "party_change", 'expense', 'unemployment', 'turnout', 'crime']: return answer == "Yes"
+    elif key in ["mp_change", "party_change", 'expense', 'unemployment', 'turnout', 'crime', 'has_government_post', 'has_opposition_post', 'is_sos', 'is_ssos', 'is_mos', 'is_smos'] or key in map(lambda dept: "dept_%s" % dept, depts): return answer == "Yes"
     else: return get_vote_id(answer)
 
 def unique(a):
@@ -142,12 +150,14 @@ def row_matches(r, query): return all(r[y] == x for y, x in query.items())
 def find_result(answers):
     m = len(answers)
     k = 10
+    t=5
     limit = int(1e2)
 
     best_epsilon_diff = float("inf")
     mps = []
 
-    for i in range(m):
+    for i in range(0, t):
+        if i >= m: continue
         A = map(dict, list(itertools.islice(itertools.combinations(answers.items(), m-i), limit)))
 
         P = map(lambda a: find_results(a), A)
@@ -167,6 +177,7 @@ def find_result(answers):
             return [M, mps]
 
     print "Epsilon diff: %d" % best_epsilon_diff
+    print any(map(lambda m: m['last_name'] == 'Cameron', mps))
 
     return [[], mps]
 
@@ -186,7 +197,9 @@ def least_covariance(orig_data, cols_to_skip):
     orig_data = filter(lambda r: len(r) == modelen, orig_data)
 
     cols_to_skip.extend(['first_name', 'last_name', '_id'])
-    cols_to_hash = ['party', 'mp_change', 'party_change', 'election_reason', 'region', 'gender', 'expense', 'unemployment', 'turnout', 'crime']
+    cols_to_hash = ['party', 'mp_change', 'party_change', 'election_reason', 'region', 'gender', 'expense', 'unemployment', 'turnout', 'crime', 'has_government_post', 'has_opposition_post', 'is_sos', 'is_ssos', 'is_mos', 'is_smos']
+    cols_to_hash.extend(map(lambda dept: "dept_%s" % dept, depts))
+    cols_to_hash = set(cols_to_hash)
 
     data = map(lambda r: filter(lambda (k, v): k not in cols_to_skip, r.items()), orig_data)
     cols = [[k for k, v in r] for r in data]

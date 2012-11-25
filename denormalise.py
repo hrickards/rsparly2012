@@ -1,5 +1,6 @@
 import pymongo, sys, random
 from fish import ProgressFish
+depts = open('depts', 'r').read().split("\n")[1:-1]
 
 mconn = pymongo.Connection()
 db = mconn.rsparly2012
@@ -8,6 +9,7 @@ ms = db.ms
 linkage = db.mpidlinktabledata
 election_results = db['2010electionresults']
 biodata = db.biodata
+postsdata = db.postsdata
 voterecordvdm = db.voterecordvdm
 vote_types = db.voterecordvotetype
 divisions = db.voterecorddivisions
@@ -57,6 +59,16 @@ for i, datum in enumerate(data):
     bio = biodata.find_one({'dods_id': links['DODS_id']})
     gender = bio['gender']
     mp['gender'] = gender
+
+    posts = postsdata.find_one({'dods_id': links['DODS_id']})
+    mp['has_government_post'] = posts['has_government_post']
+    mp['has_opposition_post'] = posts['has_opposition_post']
+    mp['is_sos'] = posts['is_sos']
+    mp['is_ssos'] = posts['is_ssos']
+    mp['is_mos'] = posts['is_mos']
+    mp['is_smos'] = posts['is_smos']
+    theirdepts = posts['depts']
+    for dept in depts: mp["dept_%s" % dept] = dept in theirdepts
 
     unemployment = unemployments.find_one({'Parliament_Constituency_id': links['Parliament_Constituency_id']})
     if unemployment == None: continue
